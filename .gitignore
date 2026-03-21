@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+
+# Build output
+dist/
+build/
+
+# Uploads directory
+uploads/
+!uploads/.gitkeep
+
+# Prisma
+# (You might want to keep the schema but ignore generated files if you don't commit them)
+# prisma/generated/
+
+# OS metadata
+.DS_Store
+Thumbs.db
