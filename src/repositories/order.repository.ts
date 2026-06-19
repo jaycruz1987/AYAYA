@@ -1,58 +1,76 @@
-import { Order, Prisma } from '@prisma/client';
-import { prisma } from '../config/database';
-import { IBaseRepository } from './base.repository';
+import { PrismaClient, Order, Prisma } from '@prisma/client';
 
-export class OrderRepository implements IBaseRepository<Order, Prisma.OrderCreateInput, Prisma.OrderUpdateInput> {
-  async findById(id: string): Promise<Order | null> {
-    return prisma.order.findUnique({
-      where: { id },
-      include: {
-        orderItems: true,
-      },
-    });
-  }
+const prisma = new PrismaClient();
 
-  async findAll(filter?: Prisma.OrderWhereInput): Promise<Order[]> {
+export class OrderRepository {
+  async findAll(filters?: {
+    orderStatus?: string;
+    paymentStatus?: string;
+    fulfillmentStatus?: string;
+    merchantId?: string;
+    orderNo?: string;
+  }): Promise<Order[]> {
+    const where: Prisma.OrderWhereInput = {
+      deletedAt: null,
+    };
+
+    if (filters?.orderStatus) where.orderStatus = filters.orderStatus;
+    if (filters?.paymentStatus) where.paymentStatus = filters.paymentStatus;
+    if (filters?.fulfillmentStatus) where.fulfillmentStatus = filters.fulfillmentStatus;
+    if (filters?.merchantId) where.merchantId = filters.merchantId;
+    if (filters?.orderNo) {
+      where.orderNo = {
+        contains: filters.orderNo,
+        mode: 'insensitive'
+      };
+    }
+
     return prisma.order.findMany({
-      where: {
-        ...filter,
-        deletedAt: null, // Always apply soft delete filter by default
+      where,
+      include: {
+        merchant: {
+          select: { name: true }
+        },
+        user: {
+          select: { nickname: true, email: true, phone: true }
+        },
+        orderItems: true
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async create(data: Prisma.OrderCreateInput): Promise<Order> {
-    return prisma.order.create({
-      data,
+  async findById(id: string): Promise<Order | null> {
+    return prisma.order.findFirst({
+      where: { id, deletedAt: null },
       include: {
-        orderItems: true,
+        merchant: true,
+        user: true,
+        orderItems: true
       },
     });
   }
 
-  async update(id: string, data: Prisma.OrderUpdateInput): Promise<Order> {
+  async updateStatus(
+    id: string, 
+    data: {
+      orderStatus?: string;
+      paymentStatus?: string;
+      fulfillmentStatus?: string;
+    }
+  ): Promise<Order> {
     return prisma.order.update({
       where: { id },
       data,
+      include: {
+        merchant: {
+          select: { name: true }
+        },
+        user: {
+          select: { nickname: true, email: true, phone: true }
+        },
+        orderItems: true
+      }
     });
-  }
-
-  async delete(id: string): Promise<boolean> {
-    // Soft delete implementation
-    await prisma.order.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
-    return true;
-  }
-
-  // Domain specific queries
-  async findByUserId(userId: string): Promise<Order[]> {
-    return this.findAll({ userId });
-  }
-
-  async findByMerchantId(merchantId: string): Promise<Order[]> {
-    return this.findAll({ merchantId });
   }
 }

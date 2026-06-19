@@ -8,6 +8,12 @@ export class MerchantRepository implements IBaseRepository<Merchant, Prisma.Merc
       where: { id },
       include: {
         category: true,
+        products: {
+          where: { deletedAt: null },
+          include: {
+            category: true
+          }
+        }
       },
     });
   }

@@ -1,98 +1,68 @@
-import { Order, Prisma } from '@prisma/client';
 import { OrderRepository } from '../repositories/order.repository';
-import { prisma } from '../config/database';
+import { Order } from '@prisma/client';
 
 export class OrderService {
-  private repository: OrderRepository;
+  private orderRepository: OrderRepository;
 
   constructor() {
-    this.repository = new OrderRepository();
+    this.orderRepository = new OrderRepository();
   }
 
-  /**
-   * Core logic for creating a new order following MVP rules:
-   * 1. Total amount must be calculated from database prices (simulated here for brevity, in real app fetch product prices)
-   * 2. Default statuses: PENDING, UNPAID, PENDING
-   * 3. Delivery address validation based on orderType
-   */
-  async createOrder(data: {
-    userId: string;
-    merchantId: string;
-    orderType: string; // DELIVERY, PICKUP, DINE_IN
-    paymentMethod: string;
-    items: { productId: string; quantity: number }[];
-    deliveryAddressSnapshot?: any;
-    remarks?: string;
-  }): Promise<Order> {
-    
-    // Rule 1: Validate Delivery Address requirement
-    if (data.orderType === 'DELIVERY' && !data.deliveryAddressSnapshot) {
-      throw new Error('Delivery address is required for DELIVERY orders');
-    }
-
-    // Generate business-friendly order number (e.g. FD20231015-XXXX)
-    const orderNo = `FD${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000)}`;
-
-    // Note: In a real implementation, we MUST fetch actual product prices from DB here
-    // to calculate the true totalAmount to prevent frontend tampering.
-    // For this boilerplate, we assume a calculated total.
-    let calculatedTotal = new Prisma.Decimal(0); 
-
-    // We use Prisma transaction to ensure order and items are created together
-    return prisma.$transaction(async (tx) => {
-      
-      // Fetch products to calculate real prices
-      let orderItemsData = [];
-      for (const item of data.items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (!product) throw new Error(`Product ${item.productId} not found`);
-        
-        const itemTotal = Number(product.price) * item.quantity;
-        calculatedTotal = new Prisma.Decimal(Number(calculatedTotal) + itemTotal);
-
-        orderItemsData.push({
-          productId: product.id,
-          productName: product.name, // Snapshot name
-          unitPrice: product.price,  // Snapshot price
-          quantity: item.quantity,
-          totalPrice: itemTotal
-        });
-      }
-
-      // Rule 2: Enforce default status constraints
-      return tx.order.create({
-        data: {
-          orderNo,
-          user: { connect: { id: data.userId } },
-          merchant: { connect: { id: data.merchantId } },
-          orderType: data.orderType,
-          totalAmount: calculatedTotal,
-          
-          // Enforced Defaults (Contract)
-          orderStatus: 'PENDING',
-          paymentStatus: 'UNPAID',
-          fulfillmentStatus: 'PENDING',
-          
-          paymentMethod: data.paymentMethod,
-          deliveryAddressSnapshot: data.deliveryAddressSnapshot ?? null,
-          remarks: data.remarks ?? null,
-
-          orderItems: {
-            create: orderItemsData
-          }
-        },
-        include: {
-          orderItems: true
-        }
-      });
-    });
+  async getAllOrders(filters?: {
+    orderStatus?: string;
+    paymentStatus?: string;
+    fulfillmentStatus?: string;
+    merchantId?: string;
+    orderNo?: string;
+  }): Promise<Order[]> {
+    return this.orderRepository.findAll(filters);
   }
 
   async getOrderById(id: string): Promise<Order | null> {
-    return this.repository.findById(id);
+    return this.orderRepository.findById(id);
   }
 
-  async getUserOrders(userId: string): Promise<Order[]> {
-    return this.repository.findByUserId(userId);
+  // Helper method to ensure strict state transitions
+  async performOrderAction(id: string, action: string): Promise<Order> {
+    const order = await this.getOrderById(id);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    const updates: { orderStatus?: string; paymentStatus?: string; fulfillmentStatus?: string } = {};
+
+    switch (action) {
+      case 'confirm':
+        if (order.orderStatus !== 'PENDING') throw new Error('Order must be PENDING to confirm');
+        updates.orderStatus = 'ACCEPTED';
+        break;
+      case 'start-preparing':
+        if (order.orderStatus !== 'ACCEPTED') throw new Error('Order must be ACCEPTED to prepare');
+        updates.fulfillmentStatus = 'PROCESSING';
+        break;
+      case 'start-delivery':
+        if (order.fulfillmentStatus !== 'PROCESSING') throw new Error('Order must be PROCESSING to deliver');
+        updates.fulfillmentStatus = 'DELIVERING';
+        break;
+      case 'complete':
+        if (order.fulfillmentStatus !== 'DELIVERING') throw new Error('Order must be DELIVERING to complete');
+        updates.orderStatus = 'COMPLETED';
+        updates.fulfillmentStatus = 'COMPLETED';
+        break;
+      case 'cancel':
+        if (order.orderStatus === 'COMPLETED' || order.orderStatus === 'CANCELLED') {
+          throw new Error('Cannot cancel a completed or already cancelled order');
+        }
+        updates.orderStatus = 'CANCELLED';
+        break;
+      case 'mark-paid':
+        if (order.paymentStatus === 'PAID') throw new Error('Order is already paid');
+        updates.paymentStatus = 'PAID';
+        break;
+      default:
+        throw new Error('Invalid order action');
+    }
+
+    return this.orderRepository.updateStatus(id, updates);
   }
 }

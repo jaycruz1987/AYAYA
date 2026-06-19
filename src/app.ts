@@ -13,6 +13,14 @@ import { productRoutes } from './routes/product.routes';
 import { roomTypeRoutes } from './routes/room-type.routes';
 import { authRoutes } from './routes/auth.routes';
 import { uploadRoutes } from './routes/upload.routes';
+import { orderRoutes } from './routes/order.routes';
+import { serviceRequestRoutes } from './routes/service-request.routes';
+import { adminProvisioningRoutes } from './routes/admin-provisioning.routes';
+import { bEndMerchantRoutes } from './routes/b-end/merchant.routes';
+import { bEndHotelRoutes } from './routes/b-end/hotel.routes';
+import { cEndOrderRoutes } from './routes/c-end/order.routes';
+import { cEndServiceRequestRoutes } from './routes/c-end/service-request.routes';
+import { cEndAddressRoutes } from './routes/c-end/address.routes';
 
 // Load environment variables
 dotenv.config();
@@ -49,6 +57,24 @@ app.use(`${API_PREFIX}/merchants`, merchantRoutes);
 
 // Hotels routes (includes nested room-types)
 app.use(`${API_PREFIX}/hotels`, hotelRoutes);
+
+// Orders routes
+app.use(`${API_PREFIX}/orders`, orderRoutes);
+
+// Service Request routes
+app.use(`${API_PREFIX}/service-requests`, serviceRequestRoutes);
+
+// Admin Provisioning routes
+app.use(`${API_PREFIX}/admin/provision`, adminProvisioningRoutes);
+
+// B-End Tenant routes
+app.use(`${API_PREFIX}/b-end/merchant`, bEndMerchantRoutes);
+app.use(`${API_PREFIX}/b-end/hotel`, bEndHotelRoutes);
+
+// C-End Client routes
+app.use(`${API_PREFIX}/c-end/orders`, cEndOrderRoutes);
+app.use(`${API_PREFIX}/c-end/service-requests`, cEndServiceRequestRoutes);
+app.use(`${API_PREFIX}/c-end/addresses`, cEndAddressRoutes);
 
 // 404 Handler
 app.use((req: Request, res: Response) => {

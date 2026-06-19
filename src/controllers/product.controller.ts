@@ -38,7 +38,11 @@ export class ProductController {
   public update = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id;
-      const updated = await this.service.updateProduct(id, req.body);
+      const existing = await this.service.getProductById(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+      const updated = await this.service.updateProduct(existing.merchantId, id, req.body);
       res.status(200).json({ success: true, data: updated });
     } catch (error) {
       next(error);
@@ -48,7 +52,11 @@ export class ProductController {
   public delete = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id;
-      await this.service.deleteProduct(id);
+      const existing = await this.service.getProductById(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+      await this.service.deleteProduct(existing.merchantId, id);
       res.status(200).json({ success: true, message: 'Product deleted' });
     } catch (error) {
       next(error);

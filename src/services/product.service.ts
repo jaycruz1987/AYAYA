@@ -1,34 +1,39 @@
 import { Product, Prisma } from '@prisma/client';
 import { ProductRepository } from '../repositories/product.repository';
+import { AppError } from '../middlewares/error.middleware';
 
 export class ProductService {
-  private repository: ProductRepository;
+  private productRepository: ProductRepository;
 
   constructor() {
-    this.repository = new ProductRepository();
+    this.productRepository = new ProductRepository();
   }
 
-  async getProductsByMerchantId(merchantId: string, categoryId?: string): Promise<Product[]> {
-    const filter: Prisma.ProductWhereInput = { merchantId, status: 'ON_SHELF' };
-    if (categoryId) filter.categoryId = categoryId;
-    return this.repository.findAll(filter);
+  async getProductsByMerchantId(merchantId: string, filters?: any): Promise<Product[]> {
+    return this.productRepository.findByMerchantId(merchantId, filters);
+  }
+
+  async getProductById(id: string): Promise<Product | null> {
+    return this.productRepository.findById(id);
   }
 
   async createProduct(merchantId: string, categoryId: string, data: Omit<Prisma.ProductCreateInput, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'merchant' | 'category'>): Promise<Product> {
-    return this.repository.create({
-      ...data,
-      merchant: { connect: { id: merchantId } },
-      category: { connect: { id: categoryId } },
-      status: data.status || 'ON_SHELF',
-      stock: data.stock ?? -1, // Contract: -1 means unlimited
-    });
+    return this.productRepository.create(merchantId, categoryId, data);
   }
 
-  async updateProduct(id: string, data: Partial<Prisma.ProductUpdateInput>): Promise<Product> {
-    return this.repository.update(id, data);
+  async updateProduct(merchantId: string, id: string, data: Partial<Prisma.ProductUpdateInput>): Promise<Product> {
+    const existing = await this.getProductById(id);
+    if (!existing || existing.merchantId !== merchantId) {
+      throw new AppError('Product not found or access denied', 404);
+    }
+    return this.productRepository.update(id, data);
   }
 
-  async deleteProduct(id: string): Promise<boolean> {
-    return this.repository.delete(id);
+  async deleteProduct(merchantId: string, id: string): Promise<boolean> {
+    const existing = await this.getProductById(id);
+    if (!existing || existing.merchantId !== merchantId) {
+      throw new AppError('Product not found or access denied', 404);
+    }
+    return this.productRepository.delete(id);
   }
 }

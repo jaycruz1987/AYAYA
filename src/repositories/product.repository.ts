@@ -2,7 +2,7 @@ import { Product, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { IBaseRepository } from './base.repository';
 
-export class ProductRepository implements IBaseRepository<Product, Prisma.ProductCreateInput, Prisma.ProductUpdateInput> {
+export class ProductRepository {
   async findById(id: string): Promise<Product | null> {
     return prisma.product.findUnique({
       where: { id },
@@ -12,22 +12,31 @@ export class ProductRepository implements IBaseRepository<Product, Prisma.Produc
     });
   }
 
-  async findAll(filter?: Prisma.ProductWhereInput): Promise<Product[]> {
+  async findByMerchantId(merchantId: string, filters?: any): Promise<Product[]> {
+    const where: Prisma.ProductWhereInput = { merchantId, status: 'ON_SHELF' };
+    if (filters?.categoryId) where.categoryId = filters.categoryId;
+    
     return prisma.product.findMany({
-      where: {
-        ...filter,
-        deletedAt: null,
-      },
+      where,
       include: {
         category: true,
       },
-      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async create(data: Prisma.ProductCreateInput): Promise<Product> {
+  async create(merchantId: string, categoryId: string, data: Omit<Prisma.ProductCreateInput, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'merchant' | 'category'>): Promise<Product> {
     return prisma.product.create({
-      data,
+      data: {
+        ...data,
+        merchant: { connect: { id: merchantId } },
+        category: { connect: { id: categoryId } },
+        status: data.status || 'ON_SHELF',
+        stock: data.stock ?? -1,
+      },
+      include: {
+        merchant: true,
+        category: true,
+      },
     });
   }
 

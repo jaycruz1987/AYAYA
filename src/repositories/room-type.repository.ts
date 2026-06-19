@@ -2,26 +2,33 @@ import { RoomType, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { IBaseRepository } from './base.repository';
 
-export class RoomTypeRepository implements IBaseRepository<RoomType, Prisma.RoomTypeCreateInput, Prisma.RoomTypeUpdateInput> {
+export class RoomTypeRepository {
   async findById(id: string): Promise<RoomType | null> {
     return prisma.roomType.findUnique({
       where: { id },
     });
   }
 
-  async findAll(filter?: Prisma.RoomTypeWhereInput): Promise<RoomType[]> {
+  async findByHotelId(hotelId: string): Promise<RoomType[]> {
     return prisma.roomType.findMany({
       where: {
-        ...filter,
+        hotelId,
         deletedAt: null,
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  async create(data: Prisma.RoomTypeCreateInput): Promise<RoomType> {
+  async create(hotelId: string, data: Omit<Prisma.RoomTypeCreateInput, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'hotel'>): Promise<RoomType> {
     return prisma.roomType.create({
-      data,
+      data: {
+        ...data,
+        hotel: { connect: { id: hotelId } },
+        status: data.status || 'ACTIVE'
+      },
+      include: {
+        hotel: true,
+      },
     });
   }
 

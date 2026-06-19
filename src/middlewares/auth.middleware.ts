@@ -2,14 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken, TokenPayload } from '../utils/jwt.util';
 import { AppError } from './error.middleware';
 
-// Extend Express Request interface to include the user payload
-declare global {
-  namespace Express {
-    interface Request {
-      user?: TokenPayload;
-    }
-  }
-}
+// The Express Request interface is extended in src/types/express.d.ts
 
 const extractToken = (req: Request): string | null => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {

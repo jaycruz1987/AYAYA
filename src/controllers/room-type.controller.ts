@@ -31,7 +31,11 @@ export class RoomTypeController {
   public update = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id; // from /room-types/:id
-      const updated = await this.service.updateRoomType(id, req.body);
+      const existing = await this.service.getRoomTypeById(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'RoomType not found' });
+      }
+      const updated = await this.service.updateRoomType(existing.hotelId, id, req.body);
       res.status(200).json({ success: true, data: updated });
     } catch (error) {
       next(error);
@@ -41,7 +45,11 @@ export class RoomTypeController {
   public delete = async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id; // from /room-types/:id
-      await this.service.deleteRoomType(id);
+      const existing = await this.service.getRoomTypeById(id);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'RoomType not found' });
+      }
+      await this.service.deleteRoomType(existing.hotelId, id);
       res.status(200).json({ success: true, message: 'Room type deleted' });
     } catch (error) {
       next(error);

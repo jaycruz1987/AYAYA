@@ -39,3 +39,6 @@ uploads/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Local auth tokens
+token.json

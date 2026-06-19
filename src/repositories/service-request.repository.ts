@@ -1,24 +1,49 @@
-import { ServiceRequest, Prisma } from '@prisma/client';
-import { prisma } from '../config/database';
-import { IBaseRepository } from './base.repository';
+import { PrismaClient, ServiceRequest, Prisma } from '@prisma/client';
 
-export class ServiceRequestRepository implements IBaseRepository<ServiceRequest, Prisma.ServiceRequestCreateInput, Prisma.ServiceRequestUpdateInput> {
-  async findById(id: string): Promise<ServiceRequest | null> {
-    return prisma.serviceRequest.findUnique({
-      where: { id },
-    });
-  }
+const prisma = new PrismaClient();
 
-  async findAll(filter?: Prisma.ServiceRequestWhereInput): Promise<ServiceRequest[]> {
+export class ServiceRequestRepository {
+  async findAll(filters?: {
+    status?: string;
+    type?: string;
+    referenceNo?: string;
+    assignedAdminUserId?: string;
+    hotelId?: string;
+  }): Promise<ServiceRequest[]> {
+    const where: Prisma.ServiceRequestWhereInput = {};
+
+    if (filters?.status) where.status = filters.status;
+    if (filters?.type) where.type = filters.type;
+    if (filters?.assignedAdminUserId) where.assignedAdminUserId = filters.assignedAdminUserId;
+    if (filters?.hotelId) where.hotelId = filters.hotelId;
+    if (filters?.referenceNo) {
+      where.referenceNo = {
+        contains: filters.referenceNo,
+        mode: 'insensitive'
+      };
+    }
+
     return prisma.serviceRequest.findMany({
-      where: filter,
+      where,
+      include: {
+        hotel: { select: { name: true } },
+        roomType: { select: { name: true } },
+        assignedAdmin: { select: { name: true, email: true } },
+        user: { select: { nickname: true, email: true } }
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async create(data: Prisma.ServiceRequestCreateInput): Promise<ServiceRequest> {
-    return prisma.serviceRequest.create({
-      data,
+  async findById(id: string): Promise<ServiceRequest | null> {
+    return prisma.serviceRequest.findUnique({
+      where: { id },
+      include: {
+        hotel: true,
+        roomType: true,
+        assignedAdmin: { select: { id: true, name: true, email: true } },
+        user: true
+      },
     });
   }
 
@@ -26,11 +51,12 @@ export class ServiceRequestRepository implements IBaseRepository<ServiceRequest,
     return prisma.serviceRequest.update({
       where: { id },
       data,
+      include: {
+        hotel: { select: { name: true } },
+        roomType: { select: { name: true } },
+        assignedAdmin: { select: { name: true, email: true } },
+        user: { select: { nickname: true, email: true } }
+      }
     });
-  }
-
-  async delete(id: string): Promise<boolean> {
-    // CRM Assets NO-DELETE policy
-    throw new Error('Service Requests are CRM assets and cannot be deleted. Update status to CLOSED instead.');
   }
 }
